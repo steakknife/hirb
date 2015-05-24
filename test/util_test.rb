@@ -56,4 +56,16 @@ describe "Util" do
     string = "sweetness man"
     Util.capture_stdout { puts string }.should == string + "\n"
   end
+
+  it "command_exists? should not find nonexistend things" do
+    Util.command_exists?('xxasdfakdsfljadsfjlk').should == false
+  end
+
+  it "command_exists? works with relative paths" do
+    Util.command_exists?('env').should == true
+  end
+
+  it "command_exists? works with absolute paths" do
+    Util.command_exists?('/usr/bin/env').should == true
+  end
 end

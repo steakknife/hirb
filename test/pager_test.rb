@@ -13,6 +13,13 @@ describe "Pager" do
     end
   end
 
+  it "pager_command allows arguments and doesn't modify the command" do
+    cmd_w_args =`which less`.chop + ' /dev/null'
+#    Hirb.enable :pager_command => cmd_w_args
+    (Hirb::Pager.pager_command = cmd_w_args).should == cmd_w_args
+#    Hirb.disable
+  end
+
   it "command_pager sets pager_command when command exists" do
     Util.expects(:command_exists?).returns(true)
     Pager.expects(:basic_pager)

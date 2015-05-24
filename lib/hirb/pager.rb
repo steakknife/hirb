@@ -1,19 +1,38 @@
+require 'shellwords'
+
 module Hirb
   # This class provides class methods for paging and an object which can conditionally page given a terminal size that is exceeded.
   class Pager
     class<<self
       # Pages using a configured or detected shell command.
       def command_pager(output, options={})
-        basic_pager(output) if valid_pager_command?(options[:pager_command])
+        if valid_pager_command?(pc = options[:pager_command])
+          basic_pager(output, pc)
+        end
       end
 
-      def pager_command(*commands) #:nodoc:
-        @pager_command = (!@pager_command.nil? && commands.empty?) ? @pager_command :
-          begin
-            env_pager = ENV['PAGER'] ? File.basename(ENV['PAGER']) : nil
-            commands = [env_pager, 'less', 'more', 'pager'] if commands.empty?
-            commands.compact.uniq.find {|e| Util.command_exists?(e[/\w+/]) }
-          end
+      # Exposed to allow user-custom, external-driven formatting
+      def basic_pager(output, override_pager_command=nil)
+        pc = basic_pager_command(override_pager_command)
+        pager = IO.popen(pc, "w")
+        begin
+          save_stdout = STDOUT.clone
+          STDOUT.reopen(pager)
+          STDOUT.puts output
+        rescue Errno::EPIPE
+        ensure
+         STDOUT.reopen(save_stdout)
+         save_stdout.close
+         pager.close
+        end
+      end
+
+      def pager_command=(*commands) #:nodoc:
+        @pager_command = pager_command_select(*commands)
+      end
+
+      def pager_command #:nodoc:
+        @pager_command || pager_command_select
       end
 
       # Pages with a ruby-only pager which either pages or quits.
@@ -27,23 +46,40 @@ module Hirb
         puts "=== Pager finished. ==="
       end
 
-      #:stopdoc:
-      def valid_pager_command?(cmd)
-        cmd ? pager_command(cmd) : pager_command
+      def page(string, inspect_mode, pgr_cmd, width, height)
+        if valid_pager_command?(pgr_cmd)
+          command_pager(string, :pager_command=>pgr_cmd)
+        else
+          default_pager(string, :width=>width, :height=>height, :inspect=>inspect_mode)
+        end
       end
 
       private
-      def basic_pager(output)
-        pager = IO.popen(pager_command, "w")
-        begin
-          save_stdout = STDOUT.clone
-          STDOUT.reopen(pager)
-          STDOUT.puts output
-        rescue Errno::EPIPE
-        ensure
-         STDOUT.reopen(save_stdout)
-         save_stdout.close
-         pager.close
+
+      #:stopdoc:
+      def valid_pager_command?(cmd)
+        cmd && Util.command_exists?(cmd.shellsplit[0])
+      end
+
+      # Default pager commands to try
+      def pager_command_fallbacks #:nodoc:
+        candidates = %w[less more pager cat]
+        candidates.unshift ENV['PAGER'] if ENV['PAGER']
+        candidates
+      end
+
+      # Pick the first valid command from commands
+      def pager_command_select(*commands)
+        commands += pager_command_fallbacks
+        commands.flatten.compact.uniq.find { |c| valid_pager_command? c }
+      end
+
+      # Actual command basic_pager needs to perform
+      def basic_pager_command(override_pager_command)
+        if valid_pager_command?(override_pager_command)
+          override_pager_command
+        else
+          pager_command
         end
       end
 
@@ -52,22 +88,22 @@ module Hirb
         !$stdin.gets.chomp[/q/i]
       end
       #:startdoc:
-    end
+    end # class methods
 
-    attr_reader :width, :height
+    attr_reader :width, :height, :options
 
     def initialize(width, height, options={})
       resize(width, height)
-      @pager_command = options[:pager_command] if options[:pager_command]
+      @options = options
+    end
+
+    def pager_command
+      options[:pager_command] || self.class.pager_command
     end
 
     # Pages given string using configured pager.
     def page(string, inspect_mode)
-      if self.class.valid_pager_command?(@pager_command)
-        self.class.command_pager(string, :pager_command=>@pager_command)
-      else
-        self.class.default_pager(string, :width=>@width, :height=>@height, :inspect=>inspect_mode)
-      end
+      self.class.page(string, inspect_mode, pager_command, @width, @height)
     end
 
     def slice!(output, inspect_mode=false) #:nodoc:

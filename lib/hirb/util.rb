@@ -1,3 +1,5 @@
+require 'pathname'
+
 module Hirb
   # Group of handy utility functions used throughout Hirb.
   module Util
@@ -53,7 +55,13 @@ module Hirb
 
     # Determines if a shell command exists by searching for it in ENV['PATH'].
     def command_exists?(command)
-      ENV['PATH'].split(File::PATH_SEPARATOR).any? {|d| File.exist? File.join(d, command) }
+      if c = Pathname.new(command)
+        return true if c.exist? && c.absolute?
+      end
+      ENV['PATH'].split(File::PATH_SEPARATOR).any? do |d|
+        f = File.join(d, command)
+        File.executable?(f) && !File.directory?(f)
+      end
     end
 
     # Returns [width, height] of terminal when detected, nil if not detected.
