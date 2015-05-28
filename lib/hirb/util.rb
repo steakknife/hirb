@@ -55,12 +55,15 @@ module Hirb
 
     # Determines if a shell command exists by searching for it in ENV['PATH'].
     def command_exists?(command)
-      if c = Pathname.new(command)
-        return true if c.exist? && c.absolute?
-      end
+      c = Pathname.new(command)
+      return true if c.absolute? && c.executable? && !c.directory?
+      exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : ['']
       ENV['PATH'].split(File::PATH_SEPARATOR).any? do |d|
-        f = File.join(d, command)
-        File.executable?(f) && !File.directory?(f)
+        exts.any? do |ext|
+          f = command + ext
+          f = File.expand_path(f, d) unless c.absolute?
+          File.executable?(f) && !File.directory?(f)
+        end
       end
     end
 

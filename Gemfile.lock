@@ -1,0 +1,26 @@
+PATH
+  remote: .
+  specs:
+    hirb (0.7.3)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    bacon (1.2.0)
+    bacon-bits (0.1.0)
+      bacon (>= 1.1.0)
+    metaclass (0.0.4)
+    mocha (0.12.10)
+      metaclass (~> 0.0.1)
+    mocha-on-bacon (0.2.1)
+      mocha (>= 0.9.8)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  bacon (>= 1.1.0)
+  bacon-bits
+  hirb!
+  mocha (~> 0.12.1)
+  mocha-on-bacon (~> 0.2.1)
